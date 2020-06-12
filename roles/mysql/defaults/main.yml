@@ -1,0 +1,9 @@
+---
+# defaults file for mysql
+
+  # nome do banco de dados da aplicacao
+  tm_mysql_db: timesheet
+  # login a ser criado para a aplicacao
+  tm_mysql_user: root
+  # senha a ser atribuida para o login da aplicacao
+  tm_mysql_password: senha123

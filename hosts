@@ -1,0 +1,2 @@
+ [timesheet]
+ 127.0.0.1 ansible_ssh_pass=Passw0rd ansible_ssh_user=analista

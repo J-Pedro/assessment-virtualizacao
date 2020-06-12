@@ -1,0 +1,9 @@
+---
+# tasks file for mysql
+  
+  - name: Alterando a senha do usuario root
+    mysql_user:
+     name={{ tm_mysql_user }}
+     password={{ tm_mysql_password }}
+     priv=*.*:ALL
+  
