@@ -1,0 +1,203 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>JavaScript/HTML5 Timesheet (PHP, MySQL)</title>
+
+  <!-- page layout -->
+  <style type="text/css">
+    p, body, td { font-family: Tahoma, Arial, Helvetica, sans-serif; font-size: 10pt; }
+    body { padding: 0px; margin: 0px; background-color: #ffffff; }
+    a { color: #1155a3; }
+    .space { margin: 10px 0px 10px 0px; }
+    .header { background: #003267; background: linear-gradient(to right, #011329 0%,#00639e 44%,#011329 100%); padding:20px 10px; color: white; box-shadow: 0px 0px 10px 5px rgba(0,0,0,0.75); }
+    .header a { color: white; }
+    .header h1 a { text-decoration: none; }
+    .header h1 { padding: 0px; margin: 0px; }
+    .main { padding: 10px; margin-top: 10px; }
+    .generated { color: #999; margin: 5px 0px; }
+    .generated a { color: #999; }
+  </style>
+
+  <style>
+    body, input, select, button {
+      font-size: 14px;
+    }
+
+    select {
+      padding: 5px;
+    }
+
+  </style>
+
+  <!-- DayPilot library -->
+  <script src="js/daypilot/daypilot-all.min.js"></script>
+
+  <!-- helper libraries -->
+  <script src="js/jquery/jquery-3.3.1.min.js" type="text/javascript"></script>
+
+
+</head>
+<body>
+<div class="header">
+  <h1><a href='https://code.daypilot.org/46581/html5-timesheet-javascript-php'>JavaScript/HTML5 Timesheet (PHP, MySQL)</a></h1>
+  <div><a href="https://javascript.daypilot.org/">DayPilot for JavaScript</a> - HTML5 Calendar/Scheduling Components for JavaScript/Angular/React</div>
+</div>
+
+<div class="main">
+  <div class="space">
+    Employee:
+    <select id="employee"></select>
+  </div>
+
+  <div id="dp"></div>
+
+  <div class="generated">Generated using <a href="https://builder.daypilot.org/">DayPilot UI Builder</a>.</div>
+</div>
+
+<script type="text/javascript">
+  var dp = new DayPilot.Scheduler("dp");
+
+  dp.viewType = "Days";
+  dp.startDate = new DayPilot.Date().firstDayOfMonth();
+  dp.days = dp.startDate.daysInMonth();
+
+  dp.timeHeaders = [
+    { groupBy: "Day", format: "MMMM yyyy" },
+    { groupBy: "Hour"}
+  ];
+
+  dp.heightSpec = "Max";
+  dp.height = 400;
+
+  dp.cellWidthSpec = "Auto";
+
+  dp.rowHeaderColumns = [
+    { title: "Day", width: 100},
+    { title: "Total", width: 100}
+  ];
+
+  dp.onBeforeRowHeaderRender = function(args) {
+    var duration = args.row.events.totalDuration();
+    var str;
+    if (duration.totalDays() >= 1) {
+      str = Math.floor(duration.totalHours()) + ":" + duration.toString("mm");
+    }
+    else {
+      str = duration.toString("H:mm");
+    }
+
+    if (args.row.columns[0]) {
+      args.row.columns[0].html = str + " hours";
+    }
+  };
+
+  // http://api.daypilot.org/daypilot-scheduler-oneventmoved/
+  dp.onEventMoved = function (args) {
+    $.post("backend_move.php",
+      {
+        id: args.e.id(),
+        newStart: args.newStart.toString(),
+        newEnd: args.newEnd.toString(),
+        newResource: args.newResource
+      },
+      function() {
+        dp.message("Moved.");
+      });
+  };
+
+  // http://api.daypilot.org/daypilot-scheduler-oneventresized/
+  dp.onEventResized = function (args) {
+    $.post("backend_resize.php",
+      {
+        id: args.e.id(),
+        newStart: args.newStart.toString(),
+        newEnd: args.newEnd.toString()
+      },
+      function() {
+        dp.message("Resized.");
+      });
+  };
+
+  // event creating
+  // http://api.daypilot.org/daypilot-scheduler-ontimerangeselected/
+  dp.onTimeRangeSelected = function (args) {
+    var name = DayPilot.Modal.prompt("New event name:", "Event").then(function(modal) {
+      dp.clearSelection();
+      if (!modal.result) return;
+
+      $.post("backend_create.php",
+        {
+          start: args.start.toString(),
+          end: args.end.toString(),
+          resource: $("#employee").val(),
+          name: modal.result
+        },
+        function(data) {
+          var e = new DayPilot.Event({
+            start: args.start,
+            end: args.end,
+            id: data.id,
+            resource: args.resource,
+            text: modal.result
+          });
+          dp.events.add(e);
+
+          dp.message(data.message);
+        });
+    });
+  };
+
+  dp.onEventClick = function(args) {
+    DayPilot.Modal.prompt("Event name:", args.e.text()).then(function(modal) {
+      if (!modal.result) {
+        return;
+      }
+
+      e = args.e;
+      $.post("backend_update.php",
+        {
+          id: e.id(),
+          name: modal.result
+        },
+        function(data) {
+          e.data.text = modal.result;
+          dp.events.update(e);
+          dp.message(data.message);
+        });
+    });
+  };
+
+  dp.init();
+
+  $(document).ready(function() {
+    loadResources();
+    $("#employee").change(function() {
+      loadEvents();
+    });
+  });
+
+  function loadResources() {
+    $.post("backend_resources.php", function(data) {
+      for (var i = 0; i < data.length; i++) {
+        var item = data[i];
+        $("#employee").append($('<option/>', {
+          value: item.id,
+          text : item.name
+        }));
+      }
+      loadEvents();
+    });
+  }
+
+  function loadEvents() {
+    var url = "backend_events.php?resource=" + $("#employee").val() + "&start=" + dp.visibleStart() + "&end=" + dp.visibleEnd();
+    dp.events.load(url, function() {
+      dp.message("Events for " + $("#employee option:selected").text() + " loaded");
+    });
+  }
+
+</script>
+
+</body>
+</html>
