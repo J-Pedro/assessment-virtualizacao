@@ -1,4 +1,4 @@
-#Projeto final da faculdade de virtualização
+# Projeto final do semestre de virtualização da faculdade
 
 Criando um ambiente virtualizado para subir aplicação de um timesheet
 
